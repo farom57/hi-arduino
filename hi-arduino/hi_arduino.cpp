@@ -49,6 +49,12 @@ int hiReceive(char* data) {
     return 0;
   }
 
+  if(buf2[0]!='O' ||buf2[1]!='K'){
+    Serial.print("HVAC response error: ");
+    Serial.println(buf2);
+    return -3;
+  }
+
 
   // parameter
   while (isHexadecimalDigit(buf2[i + 5])) {

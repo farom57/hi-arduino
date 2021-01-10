@@ -20,10 +20,12 @@ void setup() {
 
 void loop() {
   char buf[MAX_LENGTH];
-  int temp=0;
-  int err = hiRead(0x0003, &temp);
-  Serial.print("T=");Serial.print(temp);Serial.println("°C");
-
+  int addr=0;
+  for(int addr=0; addr<0x0010; addr++){
+    int err = hiRead(addr, buf);
+    delay(500);
+  }
+  
   delay(2000);
 
 }
