@@ -20,12 +20,8 @@ void setup() {
 
 void loop() {
   char buf[MAX_LENGTH];
-  int addr=0;
-  addr=Serial.parseInt();
-  if(addr!=0){
-    int err = hiRead(addr, buf);
-    delay(500);
-  }
+  hiReceiveST(buf);
+  
   
 
 

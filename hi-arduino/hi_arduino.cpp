@@ -49,7 +49,7 @@ int hiReceive(char* data) {
     return 0;
   }
 
-  if(buf2[0]!='O' ||buf2[1]!='K'){
+  if (buf2[0] != 'O' || buf2[1] != 'K') {
     Serial.print("HVAC response error: ");
     Serial.println(buf2);
     return -3;
@@ -98,6 +98,42 @@ int hiReceive(char* data) {
     Serial.println();
     return -1;
   }
+}
+
+int hiReceiveST(char* data) {
+  char buf[MAX_LENGTH];   // full message
+  char p_buf[MAX_LENGTH]; // parameter only
+  char chk_buf[5];        // checksum only
+  int len;                // message length
+  int p_len;              // parameter length
+  int i = 0;
+
+  char terminator = 0x0D;
+
+  len = Serial1.readBytesUntil(terminator, buf, 64);
+
+
+  char* buf2;             // message with correct start
+  if (buf[0] == 0) { // discard null leading character
+    buf2 = buf + 1;
+    len = len - 1;
+  } else {
+    buf2 = buf;
+  }
+
+  if (len < 1) {
+    //Serial.println("Timeout");
+    return 0;
+  }
+
+  if (buf2[0] == 'M') {
+    return -3;
+  }
+
+  Serial.write(buf2, len);
+  Serial.println();
+  return 1;
+
 }
 
 // receive integer from HVAC

@@ -9,6 +9,7 @@
 // data: null terminated char array to store the result
 // return the number of char readed, 0 if nothing after the timeout, -1 in case of checksum error
 int hiReceive(char* data);
+int hiReceiveST(char* data);
 
 // receive integer from HVAC
 // result: value received
