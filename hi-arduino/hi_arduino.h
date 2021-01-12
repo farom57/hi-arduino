@@ -3,22 +3,23 @@
 
 #include "Arduino.h"
 #define MAX_LENGTH 64
+#define DEBUG_ALL
+#define DEBUG_ERROR
 
 
-// receive data from HVAC
-// data: null terminated char array to store the result
-// return the number of char readed, 0 if nothing after the timeout, -1 in case of checksum error
-int hiReceive(char* data);
-int hiReceiveST(char* data);
 
-// receive integer from HVAC
-// result: value received
-// return the number of char readed, 0 if nothing after the timeout, -1 in case of checksum error
-int hiReceive(int* result);
 
 // Read parameter from HVAC
 int hiRead(int address, char* data);
 int hiRead(int address, int* result);
+
+// Set parameter
+int hiSet(int address, char* data, int length);
+int hiSet(int address, int value, int length);
+
+// receive data from HVAC
+int hiReceive(char* data);
+int hiReceive(int* result);
 
 // convert single hexadecimal char to byte
 byte hex2byte(char in);
