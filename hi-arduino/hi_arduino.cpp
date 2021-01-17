@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-// Classic printf function output to Serial
-void printf(char *fmt, ... ) {
+// Classic serialPrintf function output to Serial
+void serialPrintf(char *fmt, ... ) {
   char buf[128]; // resulting string limited to 128 chars
   va_list args;
   va_start (args, fmt );
@@ -129,7 +129,7 @@ int hiReceive(int* result) {
 int hiRead(int address, char* data) {
   if (address > 0xFFFF || address < 0x0000) {
 #ifdef DEBUG_ERROR
-    printf("Error 4, Address out of range: %X\n");
+    serialPrintf("Error 4, Address out of range: %X\n");
 #endif
     return -4;
   }
@@ -140,7 +140,7 @@ int hiRead(int address, char* data) {
   address_bytes[1] = address & 0xFF;
   int chksum = checksum(address_bytes, 2);
   char msg[MAX_LENGTH];
-  snprintf(msg, MAX_LENGTH, "MT P = %04X C = %04X\r", address, chksum);
+  snprintf(msg, MAX_LENGTH, "MT P=%04X C=%04X\r", address, chksum);
 
 #ifdef DEBUG_ALL
   Serial.print("Sending: ");
@@ -159,7 +159,7 @@ int hiRead(int address, char* data) {
 int hiRead(int address, int* result) {
   if (address > 0xFFFF || address < 0x0000) {
 #ifdef DEBUG_ERROR
-    printf("Error 4, Address out of range: %X\n");
+    serialPrintf("Error 4, Address out of range: %X\n");
 #endif
     return -4;
   }
@@ -170,7 +170,7 @@ int hiRead(int address, int* result) {
   address_bytes[1] = address & 0xFF;
   int chksum = checksum(address_bytes, 2);
   char msg[MAX_LENGTH];
-  snprintf(msg, MAX_LENGTH, "MT P = %04X C = %04X\r", address, chksum);
+  snprintf(msg, MAX_LENGTH, "MT P=%04X C=%04X\r", address, chksum);
 
 #ifdef DEBUG_ALL
   Serial.print("Sending: ");
@@ -192,7 +192,7 @@ int hiRead(int address, int* result) {
 int hiSet(int address, char* data, int length) {
   if (address > 0xFFFF || address < 0x0000) {
 #ifdef DEBUG_ERROR
-    printf("Error 4, Address out of range: %X\n");
+    serialPrintf("Error 4, Address out of range: %X\n");
 #endif
     return -4;
   }
@@ -206,11 +206,11 @@ int hiSet(int address, char* data, int length) {
   char msg[MAX_LENGTH];
 
   // Command message form "ST P=[address],[data] C=[checksum]\r"
-  snprintf(msg, MAX_LENGTH, "ST P = % 04X, ", address);
+  snprintf(msg, MAX_LENGTH, "ST P=%04X,", address);
   for (int i = 0; i * 2 < length; i++) {
-    snprintf(msg + 10 + i * 2, MAX_LENGTH - 10 - i * 2, " % 02X", msg_bytes[i + 2]);
+    snprintf(msg + 10 + i * 2, MAX_LENGTH - 10 - i * 2, "%02X", msg_bytes[i + 2]);
   }
-  snprintf(msg + 10 + length, MAX_LENGTH - 10 - length, " C = % 04X\r", chksum);
+  snprintf(msg + 10 + length, MAX_LENGTH - 10 - length, " C=%04X\r", chksum);
 
 #ifdef DEBUG_ALL
   Serial.print("Sending: ");
@@ -242,7 +242,7 @@ int hiSet(int address, char* data, int length) {
 int hiSet(int address, int value, int length) {
   if (address > 0xFFFF || address < 0x0000) {
 #ifdef DEBUG_ERROR
-    printf("Error 4, Address out of range: %X\n");
+    serialPrintf("Error 4, Address out of range: %X\n");
 #endif
     return -4;
   }
@@ -257,11 +257,11 @@ int hiSet(int address, int value, int length) {
   char msg[MAX_LENGTH];
 
   // Command message form "ST P=[address],[value] C=[checksum]\r"
-  snprintf(msg, MAX_LENGTH, "ST P = % 04X, ", address);
+  snprintf(msg, MAX_LENGTH, "ST P=%04X,", address);
   for (int i = 0; i * 2 < length; i++) {
-    snprintf(msg + 10 + i * 2, MAX_LENGTH - 10 - i * 2, " % 02X", msg_bytes[i + 2]);
+    snprintf(msg + 10 + i * 2, MAX_LENGTH - 10 - i * 2, "%02X", msg_bytes[i + 2]);
   }
-  snprintf(msg + 10 + length, MAX_LENGTH - 10 - length, " C = % 04X\r", chksum);
+  snprintf(msg + 10 + length, MAX_LENGTH - 10 - length, " C=%04X\r", chksum);
 
 #ifdef DEBUG_ALL
   Serial.print("Sending: ");
@@ -325,4 +325,225 @@ int checksum(byte* in, int len) {
     sum -= in[i];
   }
   return sum;
+}
+
+
+int hiReadAll(HiConfig* config){
+  int res=0;
+  res+=(hiRead(0x0000,&(config->power))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0001,&(config->mode))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0002,&(config->speed))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0003,&(config->target))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0005,&(config->u0005))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0006,&(config->permission))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0007,&(config->u0007))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0008,&(config->u0008))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0009,&(config->u0009))>0);delay(HI_DELAY);
+  res+=(hiRead(0x000A,&(config->u000A))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0011,&(config->u0011))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0012,&(config->u0012))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0013,&(config->u0013))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0014,&(config->u0014))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0100,&(config->indoor))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0101,&(config->u0101))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0102,&(config->outdoor))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0201,&(config->u0201))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0301,&(config->active))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0302,&(config->filter))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0304,&(config->absence))>0);delay(HI_DELAY);
+  res+=(hiRead(0x0900,config->sn)>0);
+  return res;
+}
+
+void printConfig(HiConfig* config){
+
+  serialPrintf("\nPower: ");
+  switch(config->power){
+    case POWER_ON:
+      serialPrintf("ON");
+      break;
+    case POWER_OFF:
+      serialPrintf("OFF");
+      break;
+    default:
+      serialPrintf("unknown value 0x%02X",config->power);
+  }
+
+  serialPrintf("\nMode: ");
+  switch(config->mode){
+    case MODE_HOT:
+      serialPrintf("HOT");
+      break;
+    case MODE_DRY:
+      serialPrintf("DRY");
+      break;
+    case MODE_COOL:
+      serialPrintf("COOL");
+      break;
+    case MODE_FAN:
+      serialPrintf("FAN");
+      break;
+    case MODE_AUTO:
+      serialPrintf("AUTO");
+      break;
+    default:
+      serialPrintf("unknown value 0x%04X",config->mode);
+  }
+
+  serialPrintf("\nFan speed: ");
+  switch(config->speed){
+    case SPEED_AUTO:
+      serialPrintf("AUTO");
+      break;
+    case SPEED_HIGH:
+      serialPrintf("HIGH");
+      break;
+    case SPEED_MEDIUM:
+      serialPrintf("MEDIUM");
+      break;
+    case SPEED_LOW:
+      serialPrintf("LOW");
+      break;
+    case SPEED_SILENT:
+      serialPrintf("SILENT");
+      break;
+    default:
+      serialPrintf("unknown value 0x%02X",config->speed);
+  }
+
+  serialPrintf("\nTarget temperature: %d degC",config->target);
+
+  serialPrintf("\nControl via remote control: ");
+  switch(config->permission){
+    case PERMISSION_ALLOWED:
+      serialPrintf("ALLOWED");
+      break;
+    case PERMISSION_PROHIBITED:
+      serialPrintf("PROHIBITED");
+      break;
+    default:
+      serialPrintf("unknown value 0x%02X",config->permission);
+  }
+
+  serialPrintf("\nCurrent indoor temperature: %d degC",config->indoor);
+
+  serialPrintf("\nCurrent outdoor temperature: %d degC",config->outdoor);
+
+  serialPrintf("\nActive: ");
+  switch(config->active){
+    case ACTIVE_ON:
+      serialPrintf("ON");
+      break;
+    case ACTIVE_OFF:
+      serialPrintf("OFF");
+      break;
+    default:
+      serialPrintf("unknown value 0x%04X",config->active);
+  }
+
+  serialPrintf("\nFilter status: ");
+  switch(config->filter){
+    case FILTER_OK:
+      serialPrintf("OK");
+      break;
+    case FILTER_BAD:
+      serialPrintf("BAD");
+      break;
+    default:
+      serialPrintf("unknown value 0x%02X",config->filter);
+  }
+
+  serialPrintf("\nAbsence mode: ");
+  switch(config->absence){
+    case ABSENCE_OFF:
+      serialPrintf("OFF");
+      break;
+    case ABSENCE_ON:
+      serialPrintf("ON");
+      break;
+    default:
+      serialPrintf("unknown value 0x%08X",config->absence);
+  }
+
+  serialPrintf("\nSerial: %s", config->sn);
+
+  serialPrintf("\nUnknown at 0x0005: 0x%02X ",config->u0005);
+  if(config->u0005==U0005_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U0005_VAL);
+
+  serialPrintf("\nUnknown at 0x0007: 0x%02X ",config->u0007);
+  if(config->u0007==U0007_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U0007_VAL);
+
+  serialPrintf("\nUnknown at 0x0008: 0x%02X ",config->u0008);
+  if(config->u0008==U0008_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U0008_VAL);
+
+  serialPrintf("\nUnknown at 0x0005: 0x%02X ",config->u0009);
+  if(config->u0009==U0009_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U0009_VAL);
+
+  serialPrintf("\nUnknown at 0x000A: 0x%02X ",config->u000A);
+  if(config->u000A==U000A_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U000A_VAL);
+
+  serialPrintf("\nUnknown at 0x0011: 0x%02X ",config->u0011);
+  if(config->u0011==U0011_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U0011_VAL);
+
+  serialPrintf("\nUnknown at 0x0012: 0x%02X ",config->u0012);
+  if(config->u0012==U0012_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U0012_VAL);
+
+  serialPrintf("\nUnknown at 0x0013: 0x%02X ",config->u0013);
+  if(config->u0013==U0013_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U0013_VAL);
+
+  serialPrintf("\nUnknown at 0x0014: 0x%02X ",config->u0014);
+  if(config->u0014==U0014_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U0014_VAL);
+
+  serialPrintf("\nUnknown at 0x0101: 0x%02X ",config->u0101);
+  if(config->u0101==U0101_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%02X",U0101_VAL);
+
+  serialPrintf("\nUnknown at 0x0201: 0x%04X ",config->u0201);
+  if(config->u0201==U0201_VAL)
+    serialPrintf("OK");
+  else
+    serialPrintf("Different from typical value 0x%04X",U0201_VAL);
+
+
+  
+  serialPrintf("\n");
+}
+
+int hiSetAll(HiConfig* config){
+  int res=0;
+  if(config->beep==0 || config->beep==7){
+    res+=(hiSet(0x0800,config->beep,2)>0);
+  }
+  if(config->mode==0x0010 || config->mode==0x0020 || config->mode==0x0040 || config->mode==0x0050 || config->mode==0x0080){
+    res+=(hiSet(0x0001,config->mode,4)>0);
+  }
 }
