@@ -122,7 +122,7 @@ struct HiConfig{
   int u0101;     // 0101-RO: unknown, always 0x7E=0b01111110
   int outdoor;   // 0102-RO: Current outdoor temperature in °C
   int u0201;     // 0201-RO: unknown, always 0000
-  int u0300;     // 0300-WO: unknown, write only, 0000=normal 0040=vacation 
+  int u0300;     // 0300-WO: unknown, write only, 0000=normal 0040=absence
   int active;    // 0301-RO: Active status 0000=Stand-by FFFF=Active
   int filter;    // 0302-RO: Filter status 0=OK 1=BAD
   int absence;   // 0304-RO: Absence 0=disabled 80=activated
