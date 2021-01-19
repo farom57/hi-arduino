@@ -1,19 +1,68 @@
 #include "hi_arduino.h"
 #include "secrets.h"
+#include "wifi_defines.h"
 #include <stdio.h>
 #include <stdarg.h>
 
-#include <WiFiNINA.h>
-///////please enter your sensitive data in the Secret tab/secrets.h
-char ssid[] = SECRET_SSID;   // your network SSID (name)
-char pass[] = SECRET_PASS;  // your network password (use for WPA, or use as key for WEP)
-int keyIndex = 0;           // your network key Index number (needed only for WEP)
-int status = WL_IDLE_STATUS;
+//#include <WiFiNINA.h>
 
-WiFiServer server(80);
+WiFiWebServer server(80);
+int status = WL_IDLE_STATUS;     // the Wifi radio's status
+int reqCount = 0;                // number of requests received
+
 HiConfig config;
 const long interval = 10000;
 unsigned long previousMillis = 0;
+
+const char form[] ="<!DOCTYPE HTML>\n\
+    <html>\n\
+    <h2>HI-LINK Arduino</h2>\n\
+    <h3>Current status:</h3>\n\
+    Power: %s<br />\n\
+    Mode: %s<br />\n\
+    Fan Speed: %s<br />\n\
+    Target temperature: %d&deg;C<br />\n\
+    Current indoor temperature: %d&deg;C<br />\n\
+    Current outdoor temperature: %d&deg;C<br />\n\
+    Active: %s<br />\n\
+    Control via remote control: %s<br />\n\
+    Filter status: %s<br />\n\
+    Absence mode: %s<br />\n\
+    Serial:  %s<br />\n\
+    Unknown parameter at 0x0005: %s<br />\n\
+    Unknown parameter at 0x0007: %s<br />\n\
+    Unknown parameter at 0x0008: %s<br />\n\
+    Unknown parameter at 0x0009: %s<br />\n\
+    Unknown parameter at 0x000A: %s<br />\n\
+    Unknown parameter at 0x0011: %s<br />\n\
+    Unknown parameter at 0x0012: %s<br />\n\
+    Unknown parameter at 0x0013: %s<br />\n\
+    Unknown parameter at 0x0014: %s<br />\n\
+    Unknown parameter at 0x0101: %s<br />\n\
+    Unknown parameter at 0x0201: %s<br />\n\
+    <h3>Change parameters:</h3>\n\
+    <form action=\"/form.html\">\n\
+    <label for=\"power\">Power:</label>\n\
+    <input %s name=\"power\" type=\"radio\" value=\"ON\" />ON\n\
+    <input %s name=\"power\" type=\"radio\" value=\"OFF\" />OFF<br />\n\
+    <label for=\"mode\">Mode:</label>\n\
+    <input %s name=\"mode\" type=\"radio\" value=\"HOT\" />HOT\n\
+    <input %s name=\"mode\" type=\"radio\" value=\"DRY\" />DRY\n\
+    <input %s name=\"mode\" type=\"radio\" value=\"COOL\" />COOL\n\
+    <input %s name=\"mode\" type=\"radio\" value=\"FAN\" />FAN\n\
+    <input %s name=\"mode\" type=\"radio\" value=\"AUTO\" />AUTO<br />\n\
+    <label for=\"speed\">Fan speed:</label>\n\
+    <input %s name=\"speed\" type=\"radio\" value=\"AUTO\" />AUTO\n\
+    <input %s name=\"speed\" type=\"radio\" value=\"HIGH\" />HIGH\n\
+    <input %s name=\"speed\" type=\"radio\" value=\"MEDIUM\" />MEDIUM\n\
+    <input %s name=\"speed\" type=\"radio\" value=\"LOW\" />LOW\n\
+    <input %s name=\"speed\" type=\"radio\" value=\"SILENT\" />SILENT<br />\n\
+    <label for=\"target\">Target temperature:</label>\n\
+    <input max=\"32\" min=\"16\" name=\"target\" type=\"number\" value=\"%d\"/><br />\n\
+    <input type=\"submit\" /><br />\n\
+    </form>\n\
+    </body>\n\
+    </html>";
 
 void setup() {
   Serial.begin(9600);
@@ -26,17 +75,6 @@ void setup() {
   Serial.println("Started");
 
   initWifiWeb();
-}
-
-void loop() {
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    hiReadAll(&config);
-    printConfig(&config);
-  }
-
-  manageWifiWeb();
 }
 
 void initWifiWeb() {
@@ -62,273 +100,66 @@ void initWifiWeb() {
     // wait 10 seconds for connection:
     delay(10000);
   }
+
+  server.on(F("/"), handleRoot);
+  server.on(F("/"), handleForm);
+  server.onNotFound(handleNotFound);
   server.begin();
+
   // you're connected now, so print out the status:
   printWifiStatus();
 }
 
-void manageWifiWeb() {
-  // listen for incoming clients
-  WiFiClient client = server.available();
-  if (client) {
-    Serial.println("new client");
-    // an http request ends with a blank line
-    boolean currentLineIsBlank = true;
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        Serial.write(c);
-        // if you've gotten to the end of the line (received a newline
-        // character) and the line is blank, the http request has ended,
-        // so you can send a reply
-        if (c == '\n' && currentLineIsBlank) {
-          // send a standard http response header
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println("Connection: close");  // the connection will be closed after completion of the response
-          //client.println("Refresh: 5");  // refresh the page automatically every 5 sec
-          client.println();
-          client.println("<!DOCTYPE HTML>");
-          client.println("<html>");
-          client.println("<h2>HI-LINK Arduino</h2>");
-          client.println("<h3>Current status:</h3>");
+void loop() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    hiReadAll(&config);
+    printConfig(&config);
+  }
 
-          client.print("Power: ");
-          switch (config.power) {
-            case POWER_ON:
-              client.print("ON");
-              break;
-            case POWER_OFF:
-              client.print("OFF");
-              break;
-            default:
-              clientPrintf(client, "unknown value 0x%02X", config.power);
-          }
-          client.println("<br />");
+  server.handleClient();
 
-          client.print("Mode: ");
-          switch (config.mode) {
-            case MODE_HOT:
-              client.print("HOT");
-              break;
-            case MODE_DRY:
-              client.print("DRY");
-              break;
-            case MODE_COOL:
-              client.print("COOL");
-              break;
-            case MODE_FAN:
-              client.print("FAN");
-              break;
-            case MODE_AUTO:
-              client.print("AUTO");
-              break;
-            default:
-              clientPrintf(client, "unknown value 0x%04X", config.mode);
-          }
-          client.println("<br />");
+}
 
-          client.print("Fan Speed: ");
-          switch (config.speed) {
-            case SPEED_AUTO:
-              client.print("AUTO");
-              break;
-            case SPEED_HIGH:
-              client.print("HIGH");
-              break;
-            case SPEED_MEDIUM:
-              client.print("MEDIUM");
-              break;
-            case SPEED_LOW:
-              client.print("LOW");
-              break;
-            case SPEED_SILENT:
-              client.print("SILENT");
-              break;
-            default:
-              clientPrintf(client, "unknown value 0x%02X", config.speed);
-          }
-          client.println("<br />");
 
-          clientPrintf(client, "Target temperature: %d&deg;C<br />\n", config.target);
 
-          clientPrintf(client, "Current indoor temperature: %d&deg;C<br />\n", config.indoor);
-
-          clientPrintf(client, "Current outdoor temperature: %d&deg;C<br />\n", config.outdoor);
-
-          client.print("Active: ");
-          switch (config.active) {
-            case ACTIVE_ON:
-              client.print("ON");
-              break;
-            case ACTIVE_OFF:
-              client.print("OFF");
-              break;
-            default:
-              clientPrintf(client, "unknown value 0x%04X", config.active);
-          }
-          client.println("<br />");
-
-          client.print("Control via remote control: ");
-          switch (config.permission) {
-            case PERMISSION_ALLOWED:
-              client.print("ALLOWED");
-              break;
-            case PERMISSION_PROHIBITED:
-              client.print("PROHIBITED");
-              break;
-            default:
-              clientPrintf(client, "unknown value 0x%02X", config.permission);
-          }
-          client.println("<br />");
-
-          client.print("Filter status: ");
-          switch (config.filter) {
-            case FILTER_OK:
-              client.print("OK");
-              break;
-            case FILTER_BAD:
-              client.print("BAD");
-              break;
-            default:
-              clientPrintf(client, "unknown value 0x%02X", config.filter);
-          }
-          client.println("<br />");
-
-          client.print("Absence mode: ");
-          switch (config.absence) {
-            case ABSENCE_OFF:
-              client.print("OFF");
-              break;
-            case ABSENCE_ON:
-              client.print("ON");
-              break;
-            default:
-              clientPrintf(client, "unknown value 0x%08X", config.absence);
-          }
-          client.println("<br />");
-
-          clientPrintf(client, "Serial:  %s<br />\n", config.sn);
-
-          clientPrintf(client, "Unknown parameter at 0x0005: 0x%02X ", config.u0005);
-          if (config.u0005 == U0005_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0005_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x0007: 0x%02X ", config.u0007);
-          if (config.u0007 == U0007_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0007_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x0008: 0x%02X ", config.u0008);
-          if (config.u0008 == U0008_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0008_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x0009: 0x%02X ", config.u0009);
-          if (config.u0009 == U0009_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0009_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x000A: 0x%02X ", config.u000A);
-          if (config.u000A == U000A_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U000A_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x0011: 0x%02X ", config.u0011);
-          if (config.u0011 == U0011_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0011_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x0012: 0x%02X ", config.u0012);
-          if (config.u0012 == U0012_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0012_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x0013: 0x%02X ", config.u0013);
-          if (config.u0013 == U0013_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0013_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x0014: 0x%02X ", config.u0014);
-          if (config.u0014 == U0014_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0014_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x0101: 0x%02X ", config.u0101);
-          if (config.u0101 == U0101_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0101_VAL);
-          client.println("<br />");
-
-          clientPrintf(client, "Unknown parameter at 0x0201: 0x%02X ", config.u0201);
-          if (config.u0201 == U0201_VAL)
-            clientPrintf(client, "OK");
-          else
-            clientPrintf(client, "Different from typical value 0x%02X", U0201_VAL);
-          client.println("<br />");
-          
-
-          client.println("<h3>Change parameters:</h3>");
-          client.println("<form action=\"/form.html\">");
-          client.println("<label for=\"power\">Power:</label> ");
-          client.println("<input checked=\"checked\" name=\"power\" type=\"radio\" value=\"ON\" />ON ");
-          client.println("<input name=\"power\" type=\"radio\" value=\"OFF\" />OFF<br />");
-          client.println("<label for=\"mode\">Mode:</label> ");
-          client.println("<input checked=\"checked\" name=\"mode\" type=\"radio\" value=\"HOT\" />HOT ");
-          client.println("<input name=\"mode\" type=\"radio\" value=\"DRY\" />DRY ");
-          client.println("<input name=\"mode\" type=\"radio\" value=\"COOL\" />COOL ");
-          client.println("<input name=\"mode\" type=\"radio\" value=\"FAN\" />FAN ");
-          client.println("<input name=\"mode\" type=\"radio\" value=\"AUTO\" />AUTO<br />");
-          client.println("<label for=\"speed\">Fan speed:</label> ");
-          client.println("<input checked=\"checked\" name=\"speed\" type=\"radio\" value=\"AUTO\" />AUTO ");
-          client.println("<input name=\"speed\" type=\"radio\" value=\"HIGH\" />HIGH ");
-          client.println("<input  name=\"speed\" type=\"radio\" value=\"MEDIUM\" />MEDIUM ");
-          client.println("<input  name=\"speed\" type=\"radio\" value=\"LOW\" />LOW ");
-          client.println("<input  name=\"speed\" type=\"radio\" value=\"SILENT\" />SILENT<br />");
-          client.println("<label for=\"target\">Target temperature:</label> ");
-          client.println("<input max=\"32\" min=\"16\" name=\"target\" type=\"number\" value=\"20\"/><br />");
-          client.println("<input type=\"submit\" /><br />");
-          client.println("<form />");
-          client.println("</html>");
-          break;
-        }
-        if (c == '\n') {
-          // you're starting a new line
-          currentLineIsBlank = true;
-        } else if (c != '\r') {
-          // you've gotten a character on the current line
-          currentLineIsBlank = false;
-        }
-      }
-    }
-    // give the web browser time to receive the data
-    delay(1);
-
-    // close the connection:
-    client.stop();
-    Serial.println("client disconnected");
+void handleForm()
+{
+  if (server.method() != HTTP_POST)
+  {
+    server.send(405, F("text/plain"), F("Method Not Allowed"));
+  } else
+  {
+    server.send(200, F("text/plain"), "POST body was:\n" + server.arg("plain"));
   }
 }
+
+void handleNotFound()
+{
+
+  String message = F("File Not Found\n\n");
+
+  message += F("URI: ");
+  message += server.uri();
+  message += F("\nMethod: ");
+  message += (server.method() == HTTP_GET) ? F("GET") : F("POST");
+  message += F("\nArguments: ");
+  message += server.args();
+  message += F("\n");
+
+  for (uint8_t i = 0; i < server.args(); i++)
+  {
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  }
+
+  server.send(404, F("text/plain"), message);
+
+
+}
+
+
+
 
 void printWifiStatus() {
   // print the SSID of the network you're attached to:
@@ -355,4 +186,266 @@ void clientPrintf(WiFiClient client, char *fmt, ... ) {
   vsnprintf(buf, 128, fmt, args);
   va_end (args);
   client.print(buf);
+}
+
+void handleRoot(){
+
+  char power_txt[64];
+  char mode_txt[64];
+  char speed_txt[64];
+  char active_txt[64];
+  char permission_txt[64];
+  char filter_txt[64];
+  char absence_txt[64];
+  char u0005_txt[64]="TODO";
+  char u0007_txt[64]="TODO";
+  char u0008_txt[64]="TODO";
+  char u0009_txt[64]="TODO";
+  char u000A_txt[64]="TODO";
+  char u0011_txt[64]="TODO";
+  char u0012_txt[64]="TODO";
+  char u0013_txt[64]="TODO";
+  char u0014_txt[64]="TODO";
+  char u0101_txt[64]="TODO";
+  char u0201_txt[64]="TODO";
+  char buf[2500];
+
+  Serial.print("0 ");
+  switch (config.power) {
+    case POWER_ON:
+      strcpy(power_txt, "ON");
+      break;
+    case POWER_OFF:
+      strcpy(power_txt, "OFF");
+      break;
+    default:
+      snprintf(power_txt, 64, "unknown value 0x%02X", config.power);
+  }
+  Serial.print("1 ");
+  switch (config.mode) {
+    case MODE_HOT:
+      strcpy(mode_txt,"HOT");
+      break;
+    case MODE_DRY:
+       strcpy(mode_txt,"DRY");
+      break;
+    case MODE_COOL:
+       strcpy(mode_txt,"COOL");
+      break;
+    case MODE_FAN:
+       strcpy(mode_txt,"FAN");
+      break;
+    case MODE_AUTO:
+       strcpy(mode_txt,"AUTO");
+      break;
+    default:
+      snprintf(mode_txt, 64, "unknown value 0x%04X", config.mode);
+  }
+  Serial.print("2 ");
+  switch (config.speed) {
+    case SPEED_AUTO:
+      strcpy(speed_txt,"AUTO");
+      break;
+    case SPEED_HIGH:
+      strcpy(speed_txt,"HIGH");
+      break;
+    case SPEED_MEDIUM:
+      strcpy(speed_txt,"MEDIUM");
+      break;
+    case SPEED_LOW:
+      strcpy(speed_txt,"LOW");
+      break;
+    case SPEED_SILENT:
+      strcpy(speed_txt,"SILENT");
+      break;
+    default:
+      snprintf(speed_txt, 64, "unknown value 0x%02X", config.speed);
+  }
+  Serial.print("3 ");
+  switch (config.active) {
+    case ACTIVE_ON:
+      strcpy(active_txt,"ON");
+      break;
+    case ACTIVE_OFF:
+      strcpy(active_txt,"OFF");
+      break;
+    default:
+      snprintf(active_txt, 64, "unknown value 0x%04X", config.active);
+  }
+  Serial.print("4 ");
+  switch (config.permission) {
+    case PERMISSION_ALLOWED:
+      strcpy(permission_txt,"ALLOWED");
+      break;
+    case PERMISSION_PROHIBITED:
+      strcpy(permission_txt,"PROHIBITED");
+      break;
+    default:
+      snprintf(permission_txt, 64, "unknown value 0x%02X", config.permission);
+  }
+  Serial.print("5 ");
+  switch (config.filter) {
+    case FILTER_OK:
+      strcpy(filter_txt,"OK");
+      break;
+    case FILTER_BAD:
+      strcpy(filter_txt,"BAD");
+      break;
+    default:
+      snprintf(filter_txt, 64, "unknown value 0x%02X", config.filter);
+  }
+  Serial.print("6 ");
+  switch (config.absence) {
+    case ABSENCE_OFF:
+      strcpy(absence_txt,"OFF");
+      break;
+    case ABSENCE_ON:
+      strcpy(absence_txt,"ON");
+      break;
+    default:
+      snprintf(absence_txt, 64, "unknown value 0x%08X", config.absence);
+  }
+  Serial.print("7 ");
+  snprintf(buf, 2500, form, 
+    power_txt,
+    mode_txt,
+    speed_txt,
+    config.target,
+    config.indoor,
+    config.outdoor,
+    active_txt,
+    permission_txt,
+    filter_txt,
+    absence_txt,
+    config.sn,
+    u0005_txt,
+    u0007_txt,
+    u0008_txt,
+    u0009_txt,
+    u000A_txt,
+    u0011_txt,
+    u0012_txt,
+    u0013_txt,
+    u0014_txt,
+    u0101_txt,
+    u0201_txt,
+    (config.power==POWER_ON?"checked=\"checked\"":""),
+    (config.power==POWER_OFF?"checked=\"checked\"":""),
+    (config.mode==MODE_HOT?"checked=\"checked\"":""),
+    (config.mode==MODE_DRY?"checked=\"checked\"":""),
+    (config.mode==MODE_COOL?"checked=\"checked\"":""),
+    (config.mode==MODE_FAN?"checked=\"checked\"":""),
+    (config.mode==MODE_AUTO?"checked=\"checked\"":""),
+    (config.speed==SPEED_AUTO?"checked=\"checked\"":""),
+    (config.speed==SPEED_HIGH?"checked=\"checked\"":""),
+    (config.speed==SPEED_MEDIUM?"checked=\"checked\"":""),
+    (config.speed==SPEED_LOW?"checked=\"checked\"":""),
+    (config.speed==SPEED_SILENT?"checked=\"checked\"":""),
+
+    config.target
+  );
+  Serial.print("8 ");
+  server.send(200, F("text/html"), buf);
+  Serial.print("9 ");
+  /*clientPrintf(client, "Unknown parameter at 0x0005: 0x%02X ", config.u0005);
+  if (config.u0005 == U0005_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0005_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x0007: 0x%02X ", config.u0007);
+  if (config.u0007 == U0007_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0007_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x0008: 0x%02X ", config.u0008);
+  if (config.u0008 == U0008_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0008_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x0009: 0x%02X ", config.u0009);
+  if (config.u0009 == U0009_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0009_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x000A: 0x%02X ", config.u000A);
+  if (config.u000A == U000A_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U000A_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x0011: 0x%02X ", config.u0011);
+  if (config.u0011 == U0011_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0011_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x0012: 0x%02X ", config.u0012);
+  if (config.u0012 == U0012_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0012_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x0013: 0x%02X ", config.u0013);
+  if (config.u0013 == U0013_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0013_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x0014: 0x%02X ", config.u0014);
+  if (config.u0014 == U0014_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0014_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x0101: 0x%02X ", config.u0101);
+  if (config.u0101 == U0101_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0101_VAL);
+  client.println("<br />");
+
+  clientPrintf(client, "Unknown parameter at 0x0201: 0x%02X ", config.u0201);
+  if (config.u0201 == U0201_VAL)
+    clientPrintf(client, "OK");
+  else
+    clientPrintf(client, "Different from typical value 0x%02X", U0201_VAL);
+  client.println("<br />");
+
+
+  client.println("<h3>Change parameters:</h3>");
+  client.println("<form action=\"/\">");
+  client.println("<label for=\"power\">Power:</label> ");
+  client.println("<input checked=\"checked\" name=\"power\" type=\"radio\" value=\"ON\" />ON ");
+  client.println("<input name=\"power\" type=\"radio\" value=\"OFF\" />OFF<br />");
+  client.println("<label for=\"mode\">Mode:</label> ");
+  client.println("<input checked=\"checked\" name=\"mode\" type=\"radio\" value=\"HOT\" />HOT ");
+  client.println("<input name=\"mode\" type=\"radio\" value=\"DRY\" />DRY ");
+  client.println("<input name=\"mode\" type=\"radio\" value=\"COOL\" />COOL ");
+  client.println("<input name=\"mode\" type=\"radio\" value=\"FAN\" />FAN ");
+  client.println("<input name=\"mode\" type=\"radio\" value=\"AUTO\" />AUTO<br />");
+  client.println("<label for=\"speed\">Fan speed:</label> ");
+  client.println("<input checked=\"checked\" name=\"speed\" type=\"radio\" value=\"AUTO\" />AUTO ");
+  client.println("<input name=\"speed\" type=\"radio\" value=\"HIGH\" />HIGH ");
+  client.println("<input  name=\"speed\" type=\"radio\" value=\"MEDIUM\" />MEDIUM ");
+  client.println("<input  name=\"speed\" type=\"radio\" value=\"LOW\" />LOW ");
+  client.println("<input  name=\"speed\" type=\"radio\" value=\"SILENT\" />SILENT<br />");
+  client.println("<label for=\"target\">Target temperature:</label> ");
+  client.println("<input max=\"32\" min=\"16\" name=\"target\" type=\"number\" value=\"20\"/><br />");
+  client.println("<input type=\"submit\" /><br />");
+  client.println("</form>");
+  client.println("</body>");
+  client.println("</html>");*/
 }
