@@ -270,12 +270,12 @@ int hiSet(int address, int value, int length) {
   Serial1.print(msg);
 
   // checking result:
-  // HVAC should answer "H~"
+  // HVAC should answer "H~" or "OK"
   char res[MAX_LENGTH];
   char terminator = 0x0D;
   int len;
   len = Serial1.readBytesUntil(terminator, res, MAX_LENGTH);
-  if (len >= 2 && (res[0] == 'H' && res[1] == '~')) {
+  if (len >= 2 && ((res[0] == 'H' && res[1] == '~')||(res[0] == 'O' && res[1] == 'K'))) {
     return 1;
   } else {
     #ifdef DEBUG_ERROR
@@ -539,11 +539,42 @@ void printConfig(HiConfig* config){
 }
 
 int hiSetAll(HiConfig* config){
+
+  //  Sample of command sequence from HI-KUMO:
+  //     ST P=0800,07 C=FFF0    BEEP
+  //     ST P=0001,0010 C=FFEE  MODE
+  //     ST P=0300,0000 C=FFFC  ???
+  //     ST P=0003,0017 C=FFE5  TARGET 
+  //     ST P=0001,0010 C=FFEE  MODE again
+  //     ST P=0300,0000 C=FFFC  ???
+  //     ST P=0003,0017 C=FFE5  TARGET again
+  //     ST P=0002,03 C=FFFA    SPEED
+  //     ST P=0014,00 C=FFEB    ???
+  //     ST P=0000,00 C=FFFF    POWER
+  //     ST P=0006,00 C=FFF9    PERMISSION
+  //     ST P=0007,00 C=FFF8    ???
+
+  
   int res=0;
-  if(config->beep==0 || config->beep==7){
-    res+=(hiSet(0x0800,config->beep,2)>0);
+
+  // I likely doesn't matters to repeat the same sequence as on the original HI-KUMO but it's just to be safe
+  res+=(hiSet(ADDR_BEEP,BEEP_ON,LEN_BEEP)>0?1:0);delay(HI_DELAY);
+  res+=(hiSet(ADDR_MODE,config->mode,LEN_MODE)>0?2:0);delay(HI_DELAY);
+  res+=(hiSet(0x0300,U0300_VAL,LEN_U0300)>0?4:0);delay(HI_DELAY);
+  res+=(hiSet(ADDR_TARGET,config->target,LEN_TARGET)>0?8:0);delay(HI_DELAY);
+  res+=(hiSet(ADDR_MODE,config->mode,LEN_MODE)>0?16:0);delay(HI_DELAY);
+  res+=(hiSet(0x0300,U0300_VAL,LEN_U0300)>0?32:0);delay(HI_DELAY);
+  res+=(hiSet(ADDR_TARGET,config->target,LEN_TARGET)>0?64:0);delay(HI_DELAY);
+  res+=(hiSet(ADDR_SPEED,config->speed,LEN_SPEED)>0?128:0);delay(HI_DELAY);
+  res+=(hiSet(0x0014,U0014_VAL,LEN_U0014)>0?256:0);delay(HI_DELAY);
+  res+=(hiSet(ADDR_POWER,config->power,LEN_POWER)>0?512:0);delay(HI_DELAY);
+  res+=(hiSet(ADDR_PERMISSION,config->permission,LEN_PERMISSION)>0?1024:0);delay(HI_DELAY);
+  res+=(hiSet(0x0007,U0007_VAL,LEN_U0007)>0?2048:0);delay(HI_DELAY);
+  if(res==4095){
+    Serial.println("Command succesful");
+  }else{
+    Serial.print("Error: ");Serial.println(res);
   }
-  if(config->mode==0x0010 || config->mode==0x0020 || config->mode==0x0040 || config->mode==0x0050 || config->mode==0x0080){
-    res+=(hiSet(0x0001,config->mode,4)>0);
-  }
+  return res;
+  
 }

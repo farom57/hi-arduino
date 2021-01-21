@@ -131,77 +131,81 @@ void handleForm()
     server.send(405, F("text/plain"), F("Method Not Allowed"));
   } else
   {
-    
-    String msg = "Command received:\n";
-    
+
+    String msg = "<html><head><meta http-equiv=\"refresh\" content=\"10;url=/\"/></head>Command received:<br/>";
+    bool ok = true;
+
     msg += "Power: ";
     if (server.arg("power") == "ON") {
-      msg += "ON\n";
+      msg += "ON<br/>";
       config.power = POWER_ON;
     } else if (server.arg("power") == "OFF") {
-      msg += "OFF\n";
+      msg += "OFF<br/>";
       config.power = POWER_OFF;
     } else {
-      msg += "Unknown value\nError, incorrect value, command not executed";
-      return;
+      msg += "Unknown value<br/>Error, incorrect value, command not executed";
+      ok = false;
     }
 
-        
+
     msg += "Mode: ";
     if (server.arg("mode") == "HOT") {
-      msg += "HOT\n";
+      msg += "HOT<br/>";
       config.mode = MODE_HOT;
     } else if (server.arg("mode") == "DRY") {
-      msg += "DRY\n";
+      msg += "DRY<br/>";
       config.mode = MODE_DRY;
     } else if (server.arg("mode") == "COOL") {
-      msg += "COOL\n";
+      msg += "COOL<br/>";
       config.mode = MODE_COOL;
     } else if (server.arg("mode") == "FAN") {
-      msg += "FAN\n";
+      msg += "FAN<br/>";
       config.mode = MODE_FAN;
     } else if (server.arg("mode") == "AUTO") {
-      msg += "AUTO\n";
+      msg += "AUTO<br/>";
       config.mode = MODE_AUTO;
     } else {
-      msg += "Unknown value\nError, incorrect value, command not executed";
-      return;
+      msg += "Unknown value<br/>Error, incorrect value, command not executed";
+      ok = false;
     }
 
-        
+
     msg += "Speed: ";
     if (server.arg("speed") == "AUTO") {
-      msg += "AUTO\n";
+      msg += "AUTO<br/>";
       config.speed = SPEED_AUTO;
     } else if (server.arg("speed") == "HIGH") {
-      msg += "HIGH\n";
+      msg += "HIGH<br/>";
       config.speed = SPEED_HIGH;
     } else if (server.arg("speed") == "MEDIUM") {
-      msg += "MEDIUM\n";
+      msg += "MEDIUM<br/>";
       config.speed = SPEED_MEDIUM;
     } else if (server.arg("speed") == "LOW") {
-      msg += "LOW\n";
+      msg += "LOW<br/>";
       config.speed = SPEED_LOW;
     } else if (server.arg("speed") == "SILENT") {
-      msg += "SILENT\n";
+      msg += "SILENT<br/>";
       config.speed = SPEED_SILENT;
     } else {
-      msg += "Unknown value\nError, incorrect value, command not executed";
-      return;
+      msg += "Unknown value<br/>Error, incorrect value, command not executed";
+      ok = false;
     }
 
-    msg+="Target: ";
-    int val;// = server.arg("target").toInt();
-    if(val>=TARGET_MIN && val<=TARGET_MAX){
-      msg += val + "degC\n";
-      config.target=val; 
-    }else{
-      //Serial.println("rec:");
-      //Serial.println(server.arg("target"));
-      //Serial.println(val);
-      msg += server.arg("target") + " xxx";//"Incorrect value\nError, incorrect value, command not executed";
+    int val = server.arg("target").toInt();
+    msg += "Target: ";
+    if (val >= TARGET_MIN && val <= TARGET_MAX) {
+      msg += String(val) + "degC<br/>";
+      config.target = val;
+    } else {
+      msg += server.arg("target") + "Incorrect value<br/>Error, incorrect value, command not executed";
+      ok = false;
     }
-    server.send(200, F("text/plain"), msg);
+
+    if (ok) {
+      int res = hiSetAll(&config);
+      msg += "Res: " + String(res);
+    }
+    server.send(200, F("text/html"), msg);
   }
 }
 

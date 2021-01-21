@@ -4,7 +4,7 @@
 #include "Arduino.h"
 #define MAX_LENGTH 64
 #define HI_DELAY 200 // duration in ms between message
-//#define DEBUG_ALL
+#define DEBUG_ALL
 #define DEBUG_ERROR
 
 #define ADDR_POWER 0x0000
@@ -67,38 +67,41 @@
 #define FILTER_OK 0x00
 #define FILTER_BAD 0x01
 
-#define U0005_LEN 2
+#define LEN_U0005 2
 #define U0005_VAL 0x7E
 
-#define U0007_LEN 2
+#define LEN_U0007 2
 #define U0007_VAL 0x00
 
-#define U0008_LEN 2
+#define LEN_U0008 2
 #define U0008_VAL 0x00
 
-#define U0009_LEN 2
+#define LEN_U0009 2
 #define U0009_VAL 0x00
 
-#define U000A_LEN 2
+#define LEN_U000A 2
 #define U000A_VAL 0x00
 
-#define U0011_LEN 2
+#define LEN_U0011 2
 #define U0011_VAL 0xFF
 
-#define U0012_LEN 2
+#define LEN_U0012 2
 #define U0012_VAL 0xFF
 
-#define U0013_LEN 2
+#define LEN_U0013 2
 #define U0013_VAL 0x03
 
-#define U0014_LEN 2
+#define LEN_U0014 2
 #define U0014_VAL 0x00
 
-#define U0101_LEN 2
+#define LEN_U0101 2
 #define U0101_VAL 0x7E
 
-#define U0201_LEN 4
+#define LEN_U0201 4
 #define U0201_VAL 0x0000
+
+#define LEN_U0300 4
+#define U0300_VAL 0x0000
 
 
 
