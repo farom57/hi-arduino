@@ -2,6 +2,7 @@
 #define HI_ARDUINO_H
 
 #include "Arduino.h"
+
 #define MAX_LENGTH 64
 #define HI_DELAY 200 // duration in ms between message
 #define DEBUG_ALL
@@ -132,6 +133,10 @@ struct HiConfig{
   int beep;      // 0800-WO: Beep (TBC), write only, 00=no beep 07=beep
   char sn[21];   // 0900-RO: serial number (TBC), always 5241442D323551504220 for me
 };
+
+extern HiConfig config;
+
+void hiInit();
 
 int hiReadAll(HiConfig* config);
 int hiSetAll(HiConfig* config);

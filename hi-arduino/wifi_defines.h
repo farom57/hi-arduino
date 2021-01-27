@@ -9,8 +9,8 @@
   Licensed under MIT license
  ***************************************************************************************************************************************/
 
-#ifndef wifi_defines_h
-#define wifi_defines_h
+#ifndef WIFI_DEFINES_H
+#define WIFI_DEFINES_H
 
 #define DEBUG_WIFI_WEBSERVER_PORT   Serial
 
@@ -298,11 +298,14 @@
   #define BOARD_NAME    BOARD_TYPE
 #endif
 
-#include <WiFiWebServer.h>
+
 
 ///////please enter your sensitive data in the Secret tab/secrets.h
 #include "secrets.h"
-char ssid[] = SECRET_SSID;   // your network SSID (name)
-char pass[] = SECRET_PASS;  // your network password (use for WPA, or use as key for WEP)
+extern char ssid[];
+extern char pass[];
 
-#endif    //wifi_defines_h
+void wifiInit();
+void printWifiStatus();
+
+#endif    //WIFI_DEFINES_H

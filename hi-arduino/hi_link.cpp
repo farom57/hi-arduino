@@ -1,15 +1,12 @@
-#include "hi_arduino.h"
-#include <stdio.h>
-#include <stdarg.h>
+#include "hi_link.h"
+#include "utility.h"
+#include "Arduino.h"
 
-// Classic serialPrintf function output to Serial
-void serialPrintf(char *fmt, ... ) {
-  char buf[128]; // resulting string limited to 128 chars
-  va_list args;
-  va_start (args, fmt );
-  vsnprintf(buf, 128, fmt, args);
-  va_end (args);
-  Serial.print(buf);
+HiConfig config;
+
+void hiInit(){
+  Serial1.begin(9600, SERIAL_8O1);
+  Serial1.setTimeout(200);
 }
 
 // receive data from HVAC as character array
