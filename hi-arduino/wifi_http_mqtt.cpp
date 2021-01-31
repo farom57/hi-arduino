@@ -12,16 +12,18 @@ char pass[] = SECRET_PASS;  // your network password (use for WPA, or use as key
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
 int reqCount = 0;                // number of requests received
 
-WiFiWebServer server(80);
 
-const char* mqttServer = "192.168.1.100";        // Broker address
+
+const char* mqttServer = SECRET_MQTT_SERVER;        // Broker address
 const char *ID        = "Hi-Arduino";  // Name of our device, must be unique
-const char *TOPIC     = "MQTT_Pub";               // Topic to subcribe to
-const char *subTopic  = "MQTT_Sub";               // Topic to subcribe to
 
 
-void wifiInit(){
-    // check for the WiFi module:
+WiFiClient  wifiClient;
+WiFiWebServer server(80);
+PubSubClient    client(mqttServer, 1883, mqttCallback, wifiClient);
+
+void wifiInit() {
+  // check for the WiFi module:
   if (WiFi.status() == WL_NO_MODULE) {
     Serial.println("Communication with WiFi module failed!");
     // don't continue
@@ -53,10 +55,10 @@ void httpInit() {
   server.on(F("/"), handleRoot);
   server.on(F("/form"), handleForm);
   server.onNotFound(handleNotFound);
-  server.begin();  
+  server.begin();
 }
 
-void httpHandleClient(){
+void httpHandleClient() {
   server.handleClient();
 }
 
@@ -402,10 +404,173 @@ void printWifiStatus() {
   Serial.println(" dBm");
 }
 
-void mqttInit(){
+void mqttReconnect() {
+  while (!client.connected())
+  {
+    Serial.print("Attempting MQTT connection to ");
+    Serial.print(mqttServer);
+
+    // Attempt to connect
+    if (client.connect("arduino", SECRET_MQTT_LOGIN, SECRET_MQTT_PASS))
+    {
+      Serial.println("...connected");
+
+      client.subscribe(MQTT_TOPIC"mode/set");
+      client.subscribe(MQTT_TOPIC"speed/set");
+      client.subscribe(MQTT_TOPIC"target/set");
+    }
+    else
+    {
+      Serial.print("...failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+  client.loop();
+}
+
+void mqttUpdate(HiConfig* config) {
+  // MODE & POWER
+  if (config->power == POWER_ON) {
+    switch (config->mode) {
+      case MODE_AUTO:
+        client.publish(MQTT_TOPIC"mode", "auto");
+        break;
+      case MODE_FAN:
+        client.publish(MQTT_TOPIC"mode", "fan_only");
+        break;
+      case MODE_COOL:
+        client.publish(MQTT_TOPIC"mode", "cool");
+        break;
+      case MODE_HOT:
+        client.publish(MQTT_TOPIC"mode", "heat");
+        break;
+      case MODE_DRY:
+        client.publish(MQTT_TOPIC"mode", "dry");
+        break;
+    }
+  } else {
+    client.publish(MQTT_TOPIC"mode", "off");
+  }
+
+  // SPEED
+  switch (config->speed) {
+    case SPEED_AUTO:
+      client.publish(MQTT_TOPIC"speed", "auto");
+      break;
+    case SPEED_SILENT:
+      client.publish(MQTT_TOPIC"speed", "silent");
+      break;
+    case SPEED_LOW:
+      client.publish(MQTT_TOPIC"speed", "low");
+      break;
+    case SPEED_MEDIUM:
+      client.publish(MQTT_TOPIC"speed", "medium");
+      break;
+    case SPEED_HIGH:
+      client.publish(MQTT_TOPIC"speed", "high");
+      break;
+  }
+
+  client.publish(MQTT_TOPIC"target", String(config->target).c_str());
+  client.publish(MQTT_TOPIC"indoor", String(config->indoor).c_str());
+  client.publish(MQTT_TOPIC"outdoor", String(config->outdoor).c_str());
+  client.publish(MQTT_TOPIC"active", config->active == ACTIVE_ON ? "on" : "off");
+  client.publish(MQTT_TOPIC"filter", config->filter == FILTER_BAD ? "bad" : "ok");
 
 }
 
-void mqttHandleClient(){
-  
+void mqttCallback(char* topic, byte* payload, unsigned int length)
+{
+  Serial.print("Message arrived: ");
+  Serial.println(topic);
+
+  // copy payload and add final null character
+  char buf[64];
+  int i;
+  for (i = 0; i < length; i++) {
+    buf[i] = payload[i];
+  }
+  buf[i] = 0;
+
+  if (strcmp(topic, MQTT_TOPIC"mode/set") == 0) {
+    if (strcmp(buf, "off") == 0) {
+      config.power = POWER_OFF;
+      hiSetAll(&config);
+      Serial.println("set mode to: OFF");
+    } else if (strcmp(buf, "heat") == 0) {
+      config.power = POWER_ON;
+      config.mode = MODE_HOT;
+      Serial.println("set mode to: HOT");
+      hiSetAll(&config);
+    } else if (strcmp(buf, "cool") == 0) {
+      config.power = POWER_ON;
+      config.mode = MODE_COOL;
+      hiSetAll(&config);
+      Serial.println("set mode to: COOL");
+    } else if (strcmp(buf, "auto") == 0) {
+      config.power = POWER_ON;
+      config.mode = MODE_AUTO;
+      hiSetAll(&config);
+      Serial.println("set mode to: AUTO");
+    } else if (strcmp(buf, "fan_only") == 0) {
+      config.power = POWER_ON;
+      config.mode = MODE_FAN;
+      hiSetAll(&config);
+      Serial.println("set mode to: FAN");
+    } else if (strcmp(buf, "dry") == 0) {
+      config.power = POWER_ON;
+      config.mode = MODE_DRY;
+      hiSetAll(&config);
+      Serial.println("set mode to: DRY");
+    } else {
+      Serial.print("unknown mode: ");
+      Serial.println(buf);
+    }
+  }
+
+  if (strcmp(topic, MQTT_TOPIC"speed/set") == 0) {
+    if (strcmp(buf, "auto") == 0) {
+      config.speed = SPEED_AUTO;
+      hiSetAll(&config);
+      Serial.println("set speed to: AUTO");
+    } else if (strcmp(buf, "silent") == 0) {
+      config.speed = SPEED_SILENT;
+      hiSetAll(&config);
+      Serial.println("set speed to: SILENT");
+    } else if (strcmp(buf, "low") == 0) {
+      config.speed = SPEED_LOW;
+      hiSetAll(&config);
+      Serial.println("set speed to: LOW");
+    } else if (strcmp(buf, "medium") == 0) {
+      config.speed = SPEED_MEDIUM;
+      hiSetAll(&config);
+      Serial.println("set speed to: MEDIUM");
+    } else if (strcmp(buf, "high") == 0) {
+      config.speed = SPEED_HIGH;
+      hiSetAll(&config);
+      Serial.println("set speed to: HIGH");
+    } else {
+      Serial.print("unknown speed: ");
+      Serial.println(buf);
+    }
+  }
+
+  if (strcmp(topic, MQTT_TOPIC"target/set") == 0) {
+    int val = String(buf).toInt();
+    if (val >= TARGET_MIN && val <= TARGET_MAX) {
+      config.target = val;
+      Serial.print("set target to: ");
+      Serial.println(val);
+      hiSetAll(&config);
+    } else {
+      Serial.print("Incorrect temperature target: ");
+      Serial.println(buf);
+    }
+  }
+
+  Serial.println();
 }

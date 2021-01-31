@@ -13,7 +13,6 @@ void setup() {
   hiInit();
   wifiInit();
   httpInit();
-  mqttInit();
 
   Serial.println("Ready");
 
@@ -24,10 +23,12 @@ void loop() {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     hiReadAll(&config);
-    printConfig(&config);
+    //printConfig(&config);
+    mqttUpdate(&config);
   }
 
   httpHandleClient();
-  mqttHandleClient();
+  mqttReconnect();
 
+  //delay(100);
 }

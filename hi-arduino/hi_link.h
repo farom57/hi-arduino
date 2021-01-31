@@ -5,7 +5,7 @@
 
 #define MAX_LENGTH 64
 #define HI_DELAY 200 // duration in ms between message
-#define DEBUG_ALL
+//#define DEBUG_ALL
 #define DEBUG_ERROR
 
 #define ADDR_POWER 0x0000

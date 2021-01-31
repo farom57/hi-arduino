@@ -1,7 +1,9 @@
 #ifndef WIFI_HTTP_MQTT_H
 #define WIFI_HTTP_MQTT_H
 #include "wifi_defines.h"
+#include "hi_link.h"
 
+#define MQTT_TOPIC "hi-arduino/"
 
 const char form[] = "<!DOCTYPE HTML>\n\
     <html>\n\
@@ -61,7 +63,9 @@ void handleForm();
 void handleNotFound();
 void handleRoot();
 
-void mqttInit();
+void mqttReconnect();
 void mqttHandleClient();
+void mqttUpdate(HiConfig* config);
+void mqttCallback(char* topic, byte* payload, unsigned int length);
 
 #endif // WIFI_HTTP_MQTT_H
