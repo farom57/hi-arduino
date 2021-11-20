@@ -477,7 +477,9 @@ void mqttUpdate(HiConfig* config) {
 
   client.publish(MQTT_TOPIC"target", String(config->target).c_str());
   client.publish(MQTT_TOPIC"indoor", String(config->indoor).c_str());
-  client.publish(MQTT_TOPIC"outdoor", String(config->outdoor).c_str());
+  if(config->outdoor!=126){
+    client.publish(MQTT_TOPIC"outdoor", String(config->outdoor).c_str());
+  }
   client.publish(MQTT_TOPIC"active", config->active == ACTIVE_ON ? "on" : "off");
   client.publish(MQTT_TOPIC"filter", config->filter == FILTER_BAD ? "bad" : "ok");
 
